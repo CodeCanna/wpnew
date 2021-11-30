@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+
+# Define our constants
+readonly WP_URL='https://www.wordpress.org';
+readonly WP_TMP_FILE_URL="$WP_URL/latest.zip";
+readonly TMP=/tmp;
+readonly WP_TMP_ZIP=$TMP/latest.zip;
+readonly WP_APACHE_DIR=/var/www/html;
+readonly WP=$WP_APACHE_DIR/wordpress;
+
+trap 'catchError $? $LINEINFO' ERR;
+
+# Check if script is being ran as root.
+function isRoot
+{
+    if [ "$EUID" -ne 0 ]; then
+        return 1;
+    fi
+    return 0;
+}
+
+function catchError
+{
+    rm -rf $WP_TMP_ZIP;
+    echo "Exitting on error code $?";
+}
+
+# Clean up any temp files
+function cleanUp
+{
+    if ! rm -rf $WP_TMP_ZIP || ! rm -rf $WP; then
+        return 1;
+    fi
+}
+
+function dest_DirEmpty
+{
+    if [ -z "$(ls -A $WP_APACHE_DIR)" ]; then
+        return 0;
+    fi
+    return 1;
+}
+
+# Print the help screen
+function printHelp
+{
+    echo "+-----------------------------------------------------------------------------+";
+    echo "|  wpnew usage:                                                               |";
+    echo "|  -h: print this help message and exit.                                      |";
+    echo "|  -n: create a new WordPress install in the default apache directory.        |";
+    echo "|                                                                             |"; 
+    echo "|  example: wpnew -n                                                          |";
+    echo "+-----------------------------------------------------------------------------+";
+}
+
+# Return 0 if /var/www/html exists
+function apache_DirExists
+{
+    if [ ! -d $WP_APACHE_DIR ]; then
+        return 1;
+    fi
+}
+
+# Get the latest version of wordpress from it's website.
+function getLatest_WP
+{
+    # Get the latest wordpress zip file or print error and exit.
+    if ! wget --verbose --output-document="$WP_TMP_ZIP" $WP_TMP_FILE_URL; then
+        return $?;
+    fi
+
+    return 0;
+}
+
+# Extract the wordpress files.
+function extractWP
+{
+    if [ ! -f "$WP_TMP_ZIP" ]; then
+        return 1;
+    fi
+
+    # Unzip wordpress to /var/www/html if it exists
+    if [ -d $WP_APACHE_DIR ]; then
+        if ! unzip -d $WP_APACHE_DIR $WP_TMP_ZIP; then
+            return $?;
+        fi
+    else
+        catchError;
+    fi    
+}
+
+# Move the files to /var/www/html/
+function moveWP_TMPFiles
+{
+    if ! mv $WP/* $WP_APACHE_DIR; then
+        return $?;
+    fi
+}
+
+# Install wordpress in the default way and default directories
+function new_wP_Default
+{
+    # TODO: We can shorten this function by using || like dest_DirEmpty || getLatest_WP || etc
+    echo "Ensuring $WP_APACHE_DIR is empty.";
+    if ! dest_DirEmpty; then
+        echo "$WP_APACHE_DIR is not empty, you must start with an empty directory.";
+        echo "This is done to ensure I'm not responsible for deleting a pre-existing WordPress installation.";
+        return 3;
+    fi
+
+    echo "Downloading the latest copy of WordPress from $WP_TMP_FILE_URL";
+    if ! getLatest_WP; then
+        echo "Failed to retrieve the latest WordPress from $WP_URL";
+        return 4;
+    fi
+
+    echo "Extracting WordPress archives to $WP_APACHE_DIR";
+    if ! extractWP; then
+        echo "Couldn't extract the WP archive, check file permissions.";
+        return 5;
+    fi
+
+    echo "Moving WordPress files from $WP to $WP_APACHE_DIR";
+    if ! moveWP_TMPFiles; then
+        echo "There was a problem moving $WP to $WP_APACHE_DIR";
+        return 6;
+    fi
+
+    echo "Cleaning Up my mess!";
+    if ! cleanUp; then
+        echo "Couldn't run clean-up, your install should be complete but for whatever reason I can't seem to clean up the tmporary files in $WP_TMP and $WP_TMP_ZIP";
+        return 7;
+    fi
+}
+
+# Handle args
+
+optstring="hn"
+
+# TODO add another option to customize the WordPress destination directory.
+while getopts ${optstring} arg; do
+    case ${arg} in
+        h)
+            printHelp;
+            ;;
+        n)
+            # Check if script is ran is root and exit if it's not.
+            if ! isRoot; then
+                echo "This part of the script must be ran as root.";
+                exit 1; # Exit if script not ran as root.
+            fi
+
+            # Ensure the Aache default directory exists, and exit if it doesn't
+            if ! apache_DirExists; then
+                echo "Couldn't find $WP_APACHE_DIR, which could indicate Apache isn't installed.";
+                echo "$WP_APACHE_DIR is created when you install Apache try running 'sudo apt install apache2' and try this script again!";
+                exit 1;
+            fi
+
+            # Exit if anything goes wrong
+            if ! new_wP_Default; then
+                exit $?;
+            fi
+
+            # Echo our success if everything went okay.
+            echo "The WordPress files have been successfully installed to $WP_APACHE_DIR";
+            echo "If your version of apache is currenlty running, and you have PHP enabled; you should see your new wordpress installation at http://localhost";
+            echo "You are free to begin the WordPress setup!";
+            ;;
+        ?)
+            echo "Invalid option: -${OPTARG}";
+            printHelp;
+            exit 1;
+            ;;
+    esac
+done
+
+# Print help if nothing is passed
+printHelp;
