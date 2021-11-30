@@ -2,7 +2,7 @@
 
 This program was created to help speed up the process of retrieving and installing the wordpress files.
 
-This program uses `wget` to retrieve the latest version of WordPress from `https://www.wordpress.org/latest`, extracts the files and moves them to the default Apache server directory for Ubuntu `/var/www/html`.
+This program uses `wget` to retrieve the latest version of WordPress from `https://www.wordpress.org/latest.zip`, extracts the files and moves them to the default Apache server directory for Ubuntu `/var/www/html`.
 
 ## Installation & Usage
 
