@@ -30,4 +30,4 @@ That's it! You should have a general wodpress install ready to be set up in /var
 
 #### NOTE: This script depends on Apache being installed to have access to /var/www/html.
 
-You can technically create `/var/www/html` manually but Apache creates this path for you upon install on Ubuntu using `sudo apt install apache2`.
+You can technically create `/var/www/html` manually but Apache creates this path for you upon install; on Ubuntu run `sudo apt install apache2`.
