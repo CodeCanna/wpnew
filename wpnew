@@ -142,6 +142,7 @@ while getopts ${optstring} arg; do
     case ${arg} in
         h)
             printHelp;
+            exit 0;
             ;;
         n)
             # Check if script is ran is root and exit if it's not.
